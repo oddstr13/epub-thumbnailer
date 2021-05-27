@@ -19,9 +19,11 @@
 # Description: An implementation of a cover thumbnailer for epub files
 # Installation: see README
 
+__version__ = "1.1.0"
+
 import os
 import re
-from io import BytesIO
+from io import BufferedReader
 import sys
 from xml.dom import minidom
 
@@ -115,10 +117,10 @@ def _choose_best_image(images):
         return max(images, key=lambda f: f.file_size)
     return None
 
-def extract_cover(cover_path):
+def extract_cover(epub, cover_path, output_file, size):
     if cover_path:
         cover = epub.open(cover_path)
-        im = Image.open(BytesIO(cover.read()))
+        im = Image.open(cover)
         im.thumbnail((size, size), Image.ANTIALIAS)
         if im.mode == "CMYK":
             im = im.convert("RGB")
@@ -126,29 +128,42 @@ def extract_cover(cover_path):
         return True
     return False
 
-# Which file are we working with?
-input_file = sys.argv[1]
-# Where do does the file have to be saved?
-output_file = sys.argv[2]
-# Required size?
-size = int(sys.argv[3])
+def main():
+    if len(sys.argv) < 4:
+        print("ERROR: Expected arguments: input output size")
+        print("Exampe: %s input.epub output.png 100" % sys.argv[0])
+        return 1
 
-# An epub is just a zip
-if os.path.isfile(input_file):
-    file_url = open(input_file, "rb")
-else:
-    file_url = urlopen(input_file)
-
-epub = zipfile.ZipFile(BytesIO(file_url.read()), "r")
-
-extraction_strategies = [get_cover_from_manifest, get_cover_by_guide, get_cover_by_filename]
-
-for strategy in extraction_strategies:
+    # Which file are we working with?
+    input_file = sys.argv[1]
+    # Where do does the file have to be saved?
+    output_file = sys.argv[2]
+    # Required size?
     try:
-        cover_path = strategy(epub)
-        if extract_cover(cover_path):
-            exit(0)
-    except Exception as ex:
-        print("Error getting cover using %s: " % strategy.__name__, ex)
+        size = int(sys.argv[3])
+    except ValueError:
+        print("ERROR: size must be a number, got `%s`." % sys.argv[3])
+        return 1
 
-exit(1)
+    # An epub is just a zip
+    if os.path.isfile(input_file):
+        file_handle = open(input_file, "rb")
+    else:
+        file_handle = BufferedReader(urlopen(input_file))
+
+    epub = zipfile.ZipFile(file_handle, "r")
+
+    extraction_strategies = [get_cover_from_manifest, get_cover_by_guide, get_cover_by_filename]
+
+    for strategy in extraction_strategies:
+        try:
+            cover_path = strategy(epub)
+            if cover_path is not None and extract_cover(epub, cover_path, output_file, size):
+                return 0
+        except Exception as ex:
+            print("Error getting cover using %s: " % strategy.__name__, ex)
+
+    return 1
+
+if __name__ == "__main__":
+    exit(main())
