@@ -121,7 +121,7 @@ def install():
         sys.exit(1)
 
     print('Installing epub-thumbnailer to %s ...' % install_dir)
-    if copy(os.path.join(source_dir, 'epub-thumbnailer.py'), os.path.join(install_dir, 'epub-thumbnailer')):
+    if copy(os.path.join(source_dir, 'epub_thumbnailer.py'), os.path.join(install_dir, 'epub-thumbnailer')):
         print('OK')
         environment = check_desktop_env()
 
